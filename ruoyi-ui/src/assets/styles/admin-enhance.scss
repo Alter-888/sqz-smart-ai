@@ -1,0 +1,192 @@
+/* ==========================================================================
+   Admin UI Enhancement (admin-enhance.scss)
+   业务页面美化增强样式表 - 仅在添加了 .enhance-layout 的页面生效
+   适用于: 商品管理、订单管理、工单管理、知识库管理
+   ========================================================================== */
+
+@keyframes adminSlideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dialogSlideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -40%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* ==========================================================================
+   全局按钮 hover/press 效果（不限于 enhance-layout）
+   排除 link 和 text 类型按钮
+   ========================================================================== */
+.el-button:not(.el-button--text):not(.is-text):not(.is-link):not(.el-button--link) {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  &:active {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+}
+
+.app-container.enhance-layout {
+  background-color: #f5f7fa;
+  min-height: calc(100vh - 84px);
+  padding: 20px;
+  transition: background-color 0.3s ease;
+  box-sizing: border-box;
+
+  .el-form--inline {
+    background: #ffffff;
+    padding: 18px 20px 0 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    margin-bottom: 16px;
+    border: 1px solid rgba(0, 0, 0, 0.02);
+    animation: adminSlideUpFade 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+    &:hover {
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      transform: translateY(-2px);
+    }
+  }
+
+  .el-row.mb8 {
+    margin-bottom: 16px !important;
+    padding: 0 8px;
+    opacity: 0;
+    animation: adminSlideUpFade 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) 0.1s forwards;
+  }
+
+  .el-table {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.02);
+    opacity: 0;
+    animation: adminSlideUpFade 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s forwards;
+
+    th.el-table__cell {
+      background-color: #fafafa !important;
+      color: #606266;
+      font-weight: 600;
+      height: 50px;
+    }
+
+    .el-table__row {
+      transition: background-color 0.2s ease, transform 0.2s ease;
+
+      &:hover > td.el-table__cell {
+        background-color: #f0fdfa !important;
+      }
+    }
+  }
+
+  .pagination-container,
+  > .el-pagination {
+    background: #ffffff;
+    padding: 12px 20px;
+    border-radius: 0 0 12px 12px;
+    margin-top: -12px !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: flex-end;
+    opacity: 0;
+    animation: adminSlideUpFade 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s forwards;
+  }
+
+  .pagination-container:not(:last-child),
+  > .el-pagination:not(:last-child) {
+    border-radius: 12px;
+    margin-top: 16px !important;
+  }
+
+  .el-tag {
+    border-radius: 20px;
+    padding: 0 12px;
+    height: 26px;
+    line-height: 24px;
+    border: none;
+    font-weight: 500;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s;
+
+    &:hover {
+      transform: scale(1.05);
+    }
+
+    &.el-tag--success { background-color: #e1f3d8; color: #67c23a; }
+    &.el-tag--warning { background-color: #faecd8; color: #e6a23c; }
+    &.el-tag--danger { background-color: #fde2e2; color: #f56c6c; }
+    &.el-tag--info { background-color: #f4f4f5; color: #909399; }
+    &.el-tag--primary { background-color: #f0fdfa; color: #14b8a6; }
+  }
+
+  .el-button {
+    border-radius: 6px;
+  }
+}
+
+.el-image__preview {
+  cursor: pointer;
+  transition: transform 0.3s ease;
+  border-radius: 6px;
+
+  &:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 10;
+  }
+}
+
+/* ==========================================================================
+   Dark Mode Adaptation (暗黑模式适配)
+   ========================================================================== */
+html.dark {
+  .app-container.enhance-layout {
+    background-color: #0a0a0a;
+
+    .el-form--inline,
+    .el-table,
+    .pagination-container,
+    > .el-pagination {
+      background-color: #141414;
+      border-color: #333;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .el-table th.el-table__cell {
+      background-color: #1f1f1f !important;
+      color: #a0a0a0;
+    }
+
+    .el-table .el-table__row:hover > td.el-table__cell {
+      background-color: #2a2a2a !important;
+    }
+
+    .el-tag {
+      &.el-tag--success { background-color: rgba(103, 194, 58, 0.2); border-color: transparent; }
+      &.el-tag--warning { background-color: rgba(230, 162, 60, 0.2); border-color: transparent; }
+      &.el-tag--danger { background-color: rgba(245, 108, 108, 0.2); border-color: transparent; }
+      &.el-tag--info { background-color: rgba(144, 147, 153, 0.2); border-color: transparent; }
+      &.el-tag--primary { background-color: rgba(20, 184, 166, 0.2); border-color: transparent; }
+    }
+  }
+}

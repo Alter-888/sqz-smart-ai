@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.SysUserSecurityQuestionMapper">
+
+    <resultMap type="com.ruoyi.system.domain.SysUserSecurityQuestion" id="SysUserSecurityQuestionResult">
+        <id     property="id"         column="id"          />
+        <result property="userId"     column="user_id"     />
+        <result property="question"   column="question"    />
+        <result property="answer"     column="answer"      />
+        <result property="sortOrder"  column="sort_order"  />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <select id="selectByUserId" parameterType="Long" resultMap="SysUserSecurityQuestionResult">
+        select id, user_id, question, answer, sort_order, create_time
+        from sys_user_security_question
+        where user_id = #{userId}
+        order by sort_order asc
+    </select>
+
+    <select id="selectById" parameterType="Long" resultMap="SysUserSecurityQuestionResult">
+        select id, user_id, question, answer, sort_order, create_time
+        from sys_user_security_question
+        where id = #{id}
+    </select>
+
+    <select id="countByUserId" parameterType="Long" resultType="int">
+        select count(1) from sys_user_security_question where user_id = #{userId}
+    </select>
+
+    <delete id="deleteByUserId" parameterType="Long">
+        delete from sys_user_security_question where user_id = #{userId}
+    </delete>
+
+    <insert id="batchInsert" parameterType="java.util.List">
+        insert into sys_user_security_question (user_id, question, answer, sort_order, create_time)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.userId}, #{item.question}, #{item.answer}, #{item.sortOrder}, sysdate())
+        </foreach>
+    </insert>
+
+</mapper>

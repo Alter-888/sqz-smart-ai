@@ -1,0 +1,18 @@
+-- =============================================
+-- Phase 1: AI MCP 工具扩展
+-- 日期: 2026-03-08
+-- 说明: 新增 UserMcpTools、NotificationMcpTools、ReviewMcpTools 三个工具类
+--       无数据库结构变更，所有依赖表已存在:
+--       - sys_user (用户信息)
+--       - biz_address (收货地址)
+--       - biz_notification (通知消息)
+--       - biz_review (商品评价)
+--       - ai_tool_call_log (工具调用日志)
+-- =============================================
+
+-- 本次更新无 DDL/DML 变更
+-- 新增 10 个 MCP 工具方法，工具调用日志自动记录到 ai_tool_call_log 表
+-- 新增工具清单:
+--   UserMcpTools: queryUserInfo, queryUserAddresses, queryDefaultAddress, setDefaultAddress
+--   NotificationMcpTools: queryUnreadNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead
+--   ReviewMcpTools: submitProductReview, checkReviewStatus

@@ -1,0 +1,23 @@
+services:
+  ai-vector:
+    image: pgvector/pgvector:pg16
+    container_name: ai-vector
+    environment:
+      POSTGRES_DB: ai_vector
+      POSTGRES_USER: vector
+      POSTGRES_PASSWORD: ${PG_PWD:-pg123456}
+    ports:
+      - "5432:5432"
+    volumes:
+      - D:/dev/docker-data/pg:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - D:/dev/docker-data/redis:/data
+    restart: unless-stopped
+
