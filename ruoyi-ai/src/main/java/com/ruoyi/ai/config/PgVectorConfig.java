@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import javax.sql.DataSource;
@@ -67,6 +68,18 @@ public class PgVectorConfig {
     @Bean("pgVectorJdbcTemplate")
     public JdbcTemplate pgVectorJdbcTemplate(@Qualifier("pgVectorDataSource") DataSource ds) {
         return new JdbcTemplate(ds);
+    }
+
+    /**
+     * 修复 P1 回归：新增第二个 DataSource(Hikari PG) 后，Spring 不再自动生成 MySQL 主库的默认 JdbcTemplate，
+     * 导致 DashboardController 等无 @Qualifier 的 JdbcTemplate 拿到的是 PG，业务查询全挂。
+     * 这里显式提供一个 @Primary 主库 JdbcTemplate，绑定 @Primary 的 dynamicDataSource（MySQL）。
+     * pgVectorJdbcTemplate 仍按名字注入，不受影响。
+     */
+    @Bean("masterJdbcTemplate")
+    @Primary
+    public JdbcTemplate masterJdbcTemplate(@Qualifier("dynamicDataSource") DataSource dataSource) {
+        return new JdbcTemplate(dataSource);
     }
 
     /**

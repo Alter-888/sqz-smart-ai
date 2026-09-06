@@ -24,14 +24,14 @@
 
     <!-- 向量库状态信息条 -->
     <el-alert v-if="vectorStatus" :closable="false" class="vector-status-bar"
-      :type="vectorStatus.exists ? 'success' : 'error'">
+      :type="vectorStatus.vectorCount > 0 ? 'success' : 'error'">
       <template #title>
         <div class="vector-status-content">
-          <span v-if="vectorStatus.exists">
-            向量库正常 | 文件大小：{{ vectorStatus.fileSize }} | 最后更新：{{ vectorStatus.lastModified }}
+          <span v-if="vectorStatus.vectorCount > 0">
+            向量库正常 | 分块数：{{ vectorStatus.vectorCount }} | 知识数：{{ vectorStatus.knowledgeCount }} | 表大小：{{ vectorStatus.tableSize }}
           </span>
           <span v-else>
-            向量库文件不存在，AI 对话将无法引用知识库内容，请点击"重建向量库"修复
+            向量库暂无数据，AI 对话暂无法引用知识库内容，请点击"重建向量库"修复
           </span>
         </div>
       </template>
