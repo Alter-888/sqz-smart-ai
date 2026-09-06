@@ -10,13 +10,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
-
 /**
- * 工具预算守卫：单轮工具调用上限，超限返回提示字符串而不抛异常。
+ * 工具预算守卫：单轮工具调用上限，超限抛 {@link ToolBudgetExceededException}。
  *
- * 为什么不抛异常：抛异常会被 Spring AI 包成工具错误再喂回模型，
- * 模型很可能换个工具继续试；返回明确提示能让它停下来对用户说话。
+ * 为什么不返回 {"error": ...}（P4 修复·方案C）：
+ * 返回提示字符串会被 Spring AI 当成"正常工具结果"喂回模型，模型认为"执行了但返回错误"，
+ * 换个参数继续重试，循环 4-5 轮（日志里工具数量 12→14→15→17 递增就是重试堆叠），用户等超久。
+ *
+ * 为什么抛异常能停（P4 修复·方案B）：
+ * {@link com.ruoyi.ai.config.ToolBudgetExecutionExceptionProcessor} 会识别本异常并把异常直接抛出，
+ * 让它穿透 Spring AI 的工具循环（不再被 process() 转成 error 字符串喂回模型），
+ * 由 {@link com.ruoyi.ai.agent.worker.AbstractWorkerAgent} 捕获后直接对用户说提示，秒级停止。
  *
  * 前置：ruoyi-ai/pom.xml 需声明 spring-boot-starter-aop（P0 已加），
  * 且 spring.aop.proxy-target-class 必须为 true（Spring Boot 默认），否则 AOP 代理反射会抛 IllegalArgumentException。
@@ -36,8 +40,8 @@ public class ToolBudgetAspect {
         if (used >= budget) {
             String tool = pjp.getSignature().getName();
             log.warn("工具预算耗尽，拒绝调用 - tool: {}, used: {}, budget: {}", tool, used, budget);
-            // 返回字符串而不是抛异常，见类注释
-            return Map.of("error", "本轮已连续调用 " + used
+            // 抛异常而不是返回提示，见类注释；由 ToolBudgetExecutionExceptionProcessor 放行抛出并中断循环
+            throw new ToolBudgetExceededException("本轮已连续调用 " + used
                     + " 次工具仍未完成，请把需求拆成两次提问，或回复『人工』转人工客服。");
         }
         return pjp.proceed();
