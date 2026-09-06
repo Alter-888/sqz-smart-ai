@@ -169,8 +169,6 @@ smart-cs:
     # 上传根目录（环境变量优先，兜底 D:/ruoyi/uploadPath）
     path: ${UPLOAD_DIR:${PROFILE_DIR:D:/ruoyi/uploadPath}}/ai-knowledge/
   vector-store:
-    # P0 仍走 SimpleVectorStore 的 json；P1 切 pgvector 后删除该行
-    path: ${PROFILE_DIR:D:/ruoyi/uploadPath}/vectorstore.json
     # PG + pgvector 向量库（01 §三；勿用 starter，见 01 §二）
     pg:
       url: jdbc:postgresql://${PG_HOST:localhost}:${PG_PORT:5432}/${PG_DB:ai_vector}

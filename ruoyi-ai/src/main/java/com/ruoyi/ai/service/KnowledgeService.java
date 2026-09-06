@@ -8,16 +8,18 @@ import com.ruoyi.ai.entity.KnowledgeDoc;
 import com.ruoyi.ai.enums.KnowledgeDocStatus;
 import com.ruoyi.ai.mapper.KnowledgeDocMapper;
 import com.ruoyi.ai.mapper.KnowledgeMapper;
+import com.ruoyi.ai.config.SmartCsProperties;
 import com.ruoyi.business.entity.Product;
 import com.ruoyi.business.service.ReviewService;
 import com.ruoyi.common.exception.ServiceException;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.TextReader;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
-import org.springframework.ai.vectorstore.SimpleVectorStore;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.io.FileSystemResource;
@@ -25,11 +27,11 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -43,22 +45,28 @@ public class KnowledgeService {
 
     private final KnowledgeMapper knowledgeMapper;
     private final KnowledgeDocMapper knowledgeDocMapper;
-    private final SimpleVectorStore vectorStore;
+    private final VectorStore vectorStore;
     private final ApplicationContext applicationContext;
     private final ReviewService reviewService;
+    private final SmartCsProperties props;
 
     /** 读写锁：保护向量存储的并发写入操作 */
     private final ReentrantReadWriteLock vectorStoreLock = new ReentrantReadWriteLock();
 
+    /** P1: 共享分块器, 按 smart-cs.rag.chunk-size(默认400) 切分知识/文档 */
+    private TokenTextSplitter splitter;
+
+    @PostConstruct
+    public void initSplitter() {
+        this.splitter = new TokenTextSplitter(props.getRag().getChunkSize(), 350, 5, 10000, true);
+    }
+
     @Value("${smart-cs.upload.path:uploads/}")
     private String uploadPath;
 
-    @Value("${smart-cs.vector-store.path:vectorstore.json}")
-    private String vectorStorePath;
-
     /**
-     * 重建向量库：将 ai_knowledge 表中所有启用的知识条目重新写入 VectorStore
-     * 用于 vectorstore.json 被删除或损坏后的恢复
+     * 重建向量库：将 ai_knowledge 表中所有启用的知识条目重新写入 PG 向量库。
+     * P1 起 PG 是主向量存储；此方法保留为「迁移/恢复工具」，用于从 MySQL 全量重建向量数据。
      */
     public int rebuildVectorStore() {
         vectorStoreLock.writeLock().lock();
@@ -197,15 +205,31 @@ public class KnowledgeService {
             TextReader textReader = new TextReader(new FileSystemResource(filePath.toFile()));
             List<Document> documents = textReader.get();
 
-            // 分片
-            TokenTextSplitter splitter = new TokenTextSplitter();
+            // 分片（共享 splitter，按 smart-cs.rag.chunk-size）
             List<Document> chunks = splitter.apply(documents);
+
+            // 重建 id + metadata（全字符串，满足 pgvector jsonb 约定），再入库
+            List<Document> finalChunks = new ArrayList<>(chunks.size());
+            for (int i = 0; i < chunks.size(); i++) {
+                Document chunk = chunks.get(i);
+                finalChunks.add(new Document(
+                        "doc_" + doc.getDocId() + "_c" + i,
+                        chunk.getText(),
+                        Map.of(
+                                "sourceType", "DOC",
+                                "docId", doc.getDocId().toString(),
+                                "title", doc.getFileName() != null ? doc.getFileName() : "",
+                                "category", "GUIDE",
+                                "chunkIndex", String.valueOf(i),
+                                "fileType", doc.getFileType() != null ? doc.getFileType() : ""
+                        )
+                ));
+            }
 
             // 向量化存储（加锁保护）
             vectorStoreLock.writeLock().lock();
             try {
-                vectorStore.add(chunks);
-                saveVectorStore();
+                vectorStore.add(finalChunks);
             } finally {
                 vectorStoreLock.writeLock().unlock();
             }
@@ -240,17 +264,31 @@ public class KnowledgeService {
                         "title", knowledge.getTitle()
                 )
         );
-        vectorStore.add(List.of(doc));
-        saveVectorStore();
+        List<Document> chunks = splitter.apply(List.of(doc));
+        List<Document> finalChunks = new ArrayList<>(chunks.size());
+        for (int i = 0; i < chunks.size(); i++) {
+            Document chunk = chunks.get(i);
+            finalChunks.add(new Document(
+                    "knowledge_" + knowledge.getKnowledgeId() + "_c" + i,
+                    chunk.getText(),
+                    Map.of(
+                            "knowledgeId", knowledge.getKnowledgeId().toString(),
+                            "category", knowledge.getCategory() != null ? knowledge.getCategory() : "",
+                            "title", knowledge.getTitle(),
+                            "sourceType", knowledge.getSourceType() != null ? knowledge.getSourceType() : "MANUAL",
+                            "sourceId", knowledge.getSourceId() != null ? knowledge.getSourceId().toString() : "",
+                            "productCategory", knowledge.getProductCategory() != null ? knowledge.getProductCategory() : "",
+                            "chunkIndex", String.valueOf(i)
+                    )
+            ));
+        }
+        vectorStore.add(finalChunks);
+        log.info("知识条目向量化完成: knowledgeId={}, 分块数={}", knowledge.getKnowledgeId(), finalChunks.size());
     }
 
     private void removeFromVectorStore(Long knowledgeId) {
-        vectorStore.delete(List.of("knowledge_" + knowledgeId));
-        saveVectorStore();
-    }
-
-    private void saveVectorStore() {
-        vectorStore.save(new File(vectorStorePath));
+        // P1: PG 下用 filter 按 knowledgeId 元数据删除该条知识的所有分块
+        vectorStore.delete("knowledgeId == '" + knowledgeId + "'");
     }
 
     /**

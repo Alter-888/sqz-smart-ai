@@ -6,14 +6,14 @@ import com.ruoyi.ai.entity.KnowledgeDoc;
 import com.ruoyi.ai.service.KnowledgeService;
 import com.ruoyi.common.core.domain.AjaxResult;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,8 +25,15 @@ public class KnowledgeController {
 
     private final KnowledgeService knowledgeService;
 
-    @Value("${smart-cs.vector-store.path:vectorstore.json}")
-    private String vectorStorePath;
+    @Value("${smart-cs.vector-store.pg.schema-name:public}")
+    private String schemaName;
+    @Value("${smart-cs.vector-store.pg.table-name:vector_store}")
+    private String tableName;
+
+    /** P1: 向量库状态改为查 PG 表（必须用 @Qualifier 指向 PG JdbcTemplate，否则会拿到 @Primary 的 MySQL） */
+    @Autowired
+    @Qualifier("pgVectorJdbcTemplate")
+    private JdbcTemplate pgVectorJdbcTemplate;
 
     @GetMapping("/list")
     @PreAuthorize("@ss.hasPermi('ai:knowledge:list')")
@@ -89,13 +96,23 @@ public class KnowledgeController {
     @GetMapping("/vector-store-status")
     @PreAuthorize("@ss.hasPermi('ai:knowledge:list')")
     public AjaxResult vectorStoreStatus() {
-        File file = new File(vectorStorePath);
+        String table = schemaName + "." + tableName;
         Map<String, Object> status = new LinkedHashMap<>();
-        status.put("exists", file.exists());
-        if (file.exists()) {
-            long sizeKB = file.length() / 1024;
-            status.put("fileSize", sizeKB > 1024 ? String.format("%.1f MB", sizeKB / 1024.0) : sizeKB + " KB");
-            status.put("lastModified", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date(file.lastModified())));
+        try {
+            Long vectorCount = pgVectorJdbcTemplate.queryForObject(
+                    "SELECT count(*) FROM " + table, Long.class);
+            Long knowledgeCount = pgVectorJdbcTemplate.queryForObject(
+                    "SELECT count(DISTINCT metadata::jsonb ->> 'knowledgeId') FROM " + table
+                            + " WHERE metadata IS NOT NULL", Long.class);
+            String tableSize = pgVectorJdbcTemplate.queryForObject(
+                    "SELECT pg_size_pretty(pg_total_relation_size('" + table + "'))", String.class);
+            status.put("vectorCount", vectorCount);
+            status.put("knowledgeCount", knowledgeCount);
+            status.put("tableSize", tableSize);
+            status.put("indexType", "HNSW / cosine");
+            status.put("dimensions", 1024);
+        } catch (Exception e) {
+            status.put("error", e.getMessage());
         }
         return AjaxResult.success(status);
     }

@@ -4,6 +4,9 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.pgvector.PgVectorStore;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -19,8 +22,8 @@ import javax.sql.DataSource;
  * 1) RuoYi 的 dynamicDataSource 带 @Primary 且指向 MySQL，这里的数据源必须是「非 Primary」，
  *    否则 MyBatis / DashboardController 注入的 JdbcTemplate 会被换成 PG，业务查询全挂。
  * 2) 因此也不能用 pgvector 的 starter（它按唯一 JdbcTemplate 装配），只能手写 Bean。
- * 3) P0 先让「PG 数据源 + JdbcTemplate」打通（验收：select 1 能打到 PG）；
- *    向量存储 Bean（PgVectorStore）在 P1 落地并替换掉 SimpleVectorStore。
+ * 3) P1 落地：提供 PgVectorStore Bean（复用 pgVectorDataSource / pgVectorJdbcTemplate），
+ *    正式替换掉 SimpleVectorStore（对应 VectorStoreConfig 已删除）。
  */
 @Configuration
 public class PgVectorConfig {
@@ -35,6 +38,16 @@ public class PgVectorConfig {
     private String password;
     @Value("${smart-cs.vector-store.pg.pool-size:5}")
     private int poolSize;
+    @Value("${smart-cs.vector-store.pg.schema-name:public}")
+    private String schemaName;
+    @Value("${smart-cs.vector-store.pg.table-name:vector_store}")
+    private String tableName;
+    @Value("${smart-cs.vector-store.pg.dimensions:1024}")
+    private int dimensions;
+    @Value("${smart-cs.vector-store.pg.initialize-schema:true}")
+    private boolean initializeSchema;
+    @Value("${smart-cs.vector-store.pg.max-document-batch-size:200}")
+    private int maxDocumentBatchSize;
 
     /** 向量库专用连接池（HikariCP 由 spring-boot-starter-jdbc 带入，无需额外依赖） */
     @Bean("pgVectorDataSource")
@@ -54,5 +67,31 @@ public class PgVectorConfig {
     @Bean("pgVectorJdbcTemplate")
     public JdbcTemplate pgVectorJdbcTemplate(@Qualifier("pgVectorDataSource") DataSource ds) {
         return new JdbcTemplate(ds);
+    }
+
+    /**
+     * PgVectorStore（P1 落地）。
+     *
+     * 说明：
+     * - 必须用 pgVectorJdbcTemplate（指向 PG），不能用默认 JdbcTemplate（那是 @Primary 的 MySQL）。
+     * - idType 用 TEXT：知识块 id 形如 knowledge_33_c0，非 UUID，避免启动/写入时 UUID.fromString 抛异常。
+     * - dimensions 显式给 1024（= text-embedding-v3 输出维度），避免启动时多打一次 embedding 探测。
+     * - 首次启动 initialize-schema=true 自动建表 + 建 HNSW/cosine 索引。
+     */
+    @Bean
+    public VectorStore vectorStore(@Qualifier("pgVectorJdbcTemplate") JdbcTemplate pgJdbc,
+                                   EmbeddingModel embeddingModel) {
+        log.info("初始化 PgVectorStore - table: {}.{}, dimensions: {}, index: HNSW/COSINE",
+                schemaName, tableName, dimensions);
+        return PgVectorStore.builder(pgJdbc, embeddingModel)
+                .schemaName(schemaName)
+                .vectorTableName(tableName)
+                .idType(PgVectorStore.PgIdType.TEXT)
+                .dimensions(dimensions)
+                .distanceType(PgVectorStore.PgDistanceType.COSINE_DISTANCE)
+                .indexType(PgVectorStore.PgIndexType.HNSW)
+                .initializeSchema(initializeSchema)
+                .maxDocumentBatchSize(maxDocumentBatchSize)
+                .build();
     }
 }
