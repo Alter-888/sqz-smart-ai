@@ -194,40 +194,6 @@ public class TicketMcpTools {
         }
     }
 
-    @Tool(description = "将对话转接给人工客服。当AI无法解决用户问题，或用户明确要求人工服务时使用此工具。系统会创建一个转人工工单。")
-    public Map<String, Object> escalateToHuman(
-            @ToolParam(description = "转接原因，简要说明为什么需要人工介入") String reason) {
-        long startTime = System.currentTimeMillis();
-        boolean success = true;
-        String errorMsg = null;
-        Long userId = SecurityUtils.getUserId();
-        log.info("工具调用 - 转人工客服: userId={}, reason={}", userId, reason);
-        publishToolCallEvent("escalateToHuman", "正在为您转接人工客服...", List.of("ticket"));
-        try {
-            Ticket ticket = new Ticket();
-            ticket.setUserId(userId);
-            ticket.setType("CONSULT");
-            ticket.setTitle("【转人工】" + (reason.length() > 40 ? reason.substring(0, 40) : reason));
-            ticket.setDescription("用户在AI对话中请求转人工服务。原因：" + reason);
-            ticket.setPriority(1);
-
-            ticketService.createTicket(ticket);
-            log.info("转人工工单创建成功: {}, 用户: {}", ticket.getTicketNo(), userId);
-            ChatContext.addToolCallName("escalateToHuman");
-
-            return Map.of(
-                    "ticketNo", ticket.getTicketNo(),
-                    "message", "已为您转接人工客服，工单号: " + ticket.getTicketNo() + "，客服人员会尽快处理。"
-            );
-        } catch (Exception e) {
-            success = false;
-            errorMsg = e.getMessage();
-            throw e;
-        } finally {
-            logToolCall("escalateToHuman", "reason=" + reason, success,
-                System.currentTimeMillis() - startTime, errorMsg);
-        }
-    }
 
     @Tool(description = "帮助用户回复售后工单。当用户要求回复工单、给客服留言时使用此工具。AI应先确认工单号和回复内容后再执行。")
     public Map<String, Object> replyTicket(

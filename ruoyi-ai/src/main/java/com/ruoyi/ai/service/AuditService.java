@@ -1,6 +1,7 @@
 package com.ruoyi.ai.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ruoyi.ai.agent.ChatOrchestrator;
 import com.ruoyi.ai.entity.ChatTurnAudit;
 import com.ruoyi.ai.mapper.ChatTurnAuditMapper;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * AI对话审计服务：异步记录每轮对话的RAG命中和工具调用情况
+ * AI对话审计服务：异步记录每轮对话的RAG命中和工具调用情况（P4 起含路由/Agent/重试埋点）
  */
 @Service
 @RequiredArgsConstructor
@@ -26,6 +27,7 @@ public class AuditService {
 
     @Async("auditExecutor")
     public void recordTurn(Long sessionId, Long userId, String userMessage, String aiResponse,
+                           ChatOrchestrator.TurnResult turn,
                            List<Map<String, String>> ragSources, List<String> toolCallNames, long durationMs) {
         try {
             ChatTurnAudit audit = new ChatTurnAudit();
@@ -40,9 +42,16 @@ public class AuditService {
             audit.setDurationMs(durationMs);
             audit.setHasRagHit(ragSources != null && !ragSources.isEmpty() ? 1 : 0);
 
+            // P4 埋点：意图 / 命中Agent / 路由来源 / 是否挂RAG / 重试次数
+            if (turn != null) {
+                audit.setIntent(turn.intent());
+                audit.setAgentId(turn.agentId() == null || turn.agentId().isBlank() ? null : turn.agentId());
+                audit.setRetryCount(turn.retryCount());
+            }
+
             chatTurnAuditMapper.insert(audit);
-            log.debug("审计记录已写入 - sessionId: {}, hasRagHit: {}, toolCalls: {}",
-                    sessionId, audit.getHasRagHit(), toolCallNames);
+            log.debug("审计记录已写入 - sessionId: {}, hasRagHit: {}, toolCalls: {}, intent: {}",
+                    sessionId, audit.getHasRagHit(), toolCallNames, audit.getIntent());
         } catch (Exception e) {
             log.warn("写入审计记录失败: {}", e.getMessage());
         }

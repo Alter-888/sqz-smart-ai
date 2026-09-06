@@ -39,7 +39,7 @@ class AuditServiceTest {
     void recordTurn_normal_insertsAudit() {
         when(chatTurnAuditMapper.insert(any(ChatTurnAudit.class))).thenReturn(1);
 
-        auditService.recordTurn(1L, 100L, "你好", "你好！有什么可以帮您？",
+        auditService.recordTurn(1L, 100L, "你好", "你好！有什么可以帮您？", null,
                 List.of(), List.of("queryOrder"), 500L);
 
         verify(chatTurnAuditMapper).insert(any(ChatTurnAudit.class));
@@ -54,7 +54,7 @@ class AuditServiceTest {
         List<Map<String, String>> ragSources = List.of(
                 Map.of("source", "退货政策.md", "content", "7天无理由退货"));
 
-        auditService.recordTurn(1L, 100L, "退货政策", "回复内容",
+        auditService.recordTurn(1L, 100L, "退货政策", "回复内容", null,
                 ragSources, List.of(), 300L);
 
         assertEquals(1, captor.getValue().getHasRagHit());
@@ -66,7 +66,7 @@ class AuditServiceTest {
         ArgumentCaptor<ChatTurnAudit> captor = ArgumentCaptor.forClass(ChatTurnAudit.class);
         when(chatTurnAuditMapper.insert(captor.capture())).thenReturn(1);
 
-        auditService.recordTurn(1L, 100L, "你好", "你好！",
+        auditService.recordTurn(1L, 100L, "你好", "你好！", null,
                 List.of(), List.of(), 200L);
 
         assertEquals(0, captor.getValue().getHasRagHit());
@@ -80,7 +80,7 @@ class AuditServiceTest {
 
         String longMessage = "测".repeat(6000);
 
-        auditService.recordTurn(1L, 100L, longMessage, "回复",
+        auditService.recordTurn(1L, 100L, longMessage, "回复", null,
                 List.of(), List.of(), 100L);
 
         assertEquals(5000, captor.getValue().getUserMessage().length());
@@ -93,7 +93,7 @@ class AuditServiceTest {
                 .thenThrow(new RuntimeException("DB连接失败"));
 
         assertDoesNotThrow(() ->
-                auditService.recordTurn(1L, 100L, "你好", "回复",
+                auditService.recordTurn(1L, 100L, "你好", "回复", null,
                         List.of(), List.of(), 100L));
     }
 }

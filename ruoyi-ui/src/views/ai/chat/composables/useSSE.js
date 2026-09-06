@@ -5,7 +5,7 @@ export function useSSE() {
   const isStreaming = ref(false)
   let eventSource = null
 
-  async function startStream(message, sessionId, onMessage, onDone, onError, onToolCall, onCardData, onRagSource, onDataChanged, onMessageId) {
+  async function startStream(message, sessionId, onMessage, onDone, onError, onIntent, onToolCall, onCardData, onRagSource, onDataChanged, onMessageId) {
     isStreaming.value = true
     let hasReceivedData = false
 
@@ -45,6 +45,18 @@ export function useSSE() {
         onMessage(event.data)
       }
     }
+
+    // 监听意图事件（路由一出结果立刻推送，用于显示"导购助手正在处理…"）
+    eventSource.addEventListener('intent', (event) => {
+      if (event.data && onIntent) {
+        try {
+          const data = JSON.parse(event.data)
+          onIntent(data)
+        } catch (e) {
+          console.warn('解析意图事件失败', e)
+        }
+      }
+    })
 
     // 监听工具调用事件
     eventSource.addEventListener('tool_call', (event) => {
