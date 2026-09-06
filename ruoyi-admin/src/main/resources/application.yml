@@ -7,7 +7,7 @@ ruoyi:
   # 版权年份
   copyrightYear: 2026
   # 文件路径 示例（ Windows配置D:/ruoyi/uploadPath，Linux配置 /home/ruoyi/uploadPath）
-  profile: D:/ruoyi/uploadPath
+  profile: ${PROFILE_DIR:D:/ruoyi/uploadPath}
   # 获取ip地址开关
   addressEnabled: false
 # 开发环境配置
@@ -166,10 +166,52 @@ spring.ai:
 # 智能客服配置
 smart-cs:
   upload:
-    path: D:/ruoyi/uploadPath/ai-knowledge/
+    # 上传根目录（环境变量优先，兜底 D:/ruoyi/uploadPath）
+    path: ${UPLOAD_DIR:${PROFILE_DIR:D:/ruoyi/uploadPath}}/ai-knowledge/
   vector-store:
-    path: D:/ruoyi/uploadPath/vectorstore.json
+    # P0 仍走 SimpleVectorStore 的 json；P1 切 pgvector 后删除该行
+    path: ${PROFILE_DIR:D:/ruoyi/uploadPath}/vectorstore.json
+    # PG + pgvector 向量库（01 §三；勿用 starter，见 01 §二）
+    pg:
+      url: jdbc:postgresql://${PG_HOST:localhost}:${PG_PORT:5432}/${PG_DB:ai_vector}
+      username: ${PG_USER:vector}
+      password: ${PG_PWD}            # 必须由环境变量提供，不写进仓库
+      schema-name: public
+      table-name: vector_store
+      dimensions: 1024               # 必须等于 text-embedding-v3 的输出维度
+      initialize-schema: true        # 首次启动自动建表 + 建 HNSW 索引
+      max-document-batch-size: 200
+      pool-size: 5                   # 向量库并发很低，5 足够
+  agent:
+    tool-budget-per-turn: 8          # 单轮工具调用上限，超出即停
+    supervisor-enabled: true         # 关掉后跨域退化为按首个命中域直连
+    supervisor-max-delegations: 3    # Supervisor 单轮最多委派几个 Worker
+    eval-sample-rate: 0.1            # 异步抽检采样率
+    hitl-enabled: true               # 高危操作先出待确认单
+    hitl-tools: cancelOrder,payOrder,checkoutFromCart,clearCart
+  model:
+    worker: ${AI_WORKER_MODEL:qwen3.7-flash}
+    router: ${AI_ROUTER_MODEL:qwen3.7-flash}
+    judge:  ${AI_JUDGE_MODEL:qwen3.7-flash}
+  rag:
+    similarity-threshold: 0.4
+    vector-top-k: 20
+    full-text-enabled: false         # P5 打开
+    full-text-top-k: 20
+    rrf-k: 60
+    fusion-top-k: 8
+    final-top-k: 4
+    chunk-size: 400
+    parent-expand: false
+    rerank:
+      enabled: false
+  eval:
+    dataset: v1
+    k: 8                  # 评测口径，定死不动
+    run-agent: false      # 是否真的跑 Worker
+    judge-enabled: false  # 是否让 judge 打忠实度分
+    user-id: -1           # 评测专用 userId，在线指标一律排除
+    legacy-retrieval: false
   chat:
     max-memory-messages: 30
     retry-max-attempts: 3
-

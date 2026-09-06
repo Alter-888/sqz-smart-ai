@@ -66,6 +66,23 @@
             <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
         </dependency>
 
+        <!-- P0: pgvector 向量库（勿用 starter，见 01 §二：starter 会拿 @Primary 的 MySQL JdbcTemplate 建表） -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-pgvector-store</artifactId>
+        </dependency>
+
+        <!-- P0: PostgreSQL 驱动（向量库用） -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+        </dependency>
+
+        <!-- P0: AOP（工具预算守卫 ToolBudgetAspect 需要；ruoyi-ai 编译期此前拿不到） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
         <!-- Spring Web MVC（SseEmitter） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -103,6 +120,17 @@
             <artifactId>spring-retry</artifactId>
         </dependency>
 
+        <!-- P0: Testcontainers（it/ 集成测试用，见 07 §2.4；版本由 spring-boot-dependencies 管理） -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- 测试依赖 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

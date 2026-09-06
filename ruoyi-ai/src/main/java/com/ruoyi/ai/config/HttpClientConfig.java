@@ -13,12 +13,18 @@ import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 
 import java.io.IOException;
+import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 /**
  * HTTP 客户端配置
  * 让 RestClient 走 JDK 系统 DNS 解析，避免代理软件干扰。
  * 使用 BufferingClientHttpRequestFactory 使响应体可重复读取，支持日志诊断。
+ *
+ * P0 修复（02 §9.1）：给请求工厂设 connectTimeout(10s) + readTimeout(60s)。
+ * 原实现不设读超时，模型端一旦卡住请求会一直挂着，Retry 模板既不重试也不失败，
+ * 用户干等 SseEmitter 的 300 秒，且 is_timeout 指标恒为 0（量不到超时）。
  */
 @Configuration
 public class HttpClientConfig {
@@ -29,15 +35,29 @@ public class HttpClientConfig {
     public RestClientCustomizer restClientCustomizer() {
         return builder -> builder
                 // BufferingClientHttpRequestFactory 包装后，响应体可多次读取（供拦截器和 Spring AI 各自读取）
-                .requestFactory(new BufferingClientHttpRequestFactory(new JdkClientHttpRequestFactory()))
+                .requestFactory(new BufferingClientHttpRequestFactory(jdkFactoryWithTimeouts()))
                 .requestInterceptor(new AiRequestLoggingInterceptor());
+    }
+
+    /**
+     * JDK HttpClient + 显式超时：
+     * connectTimeout 10s 防止连不上时无限等；readTimeout 60s 大于模型最慢正常响应（p95≈29s、最慢≈96.9s），
+     * 但远小于 SseEmitter 的 300s —— 真出现极端慢轮次，让它快点失败而不是让用户空等。
+     */
+    private JdkClientHttpRequestFactory jdkFactoryWithTimeouts() {
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+        factory.setReadTimeout(Duration.ofSeconds(60));
+        return factory;
     }
 
     /**
      * AI 请求日志拦截器：
      * 1. 对 Qwen3 模型注入 enable_thinking=false（仅 SiliconFlow 上的 Qwen3 需要）
      * 2. 注入 tool_choice=auto（确保第三方平台触发 Function Calling）
-     * 3. 记录请求/响应诊断信息
+     * 3. 记录请求/响应状态与 tool_calls 诊断（已移除打印全量请求体的 debug 循环，避免噪音与信息泄露）
      */
     static class AiRequestLoggingInterceptor implements ClientHttpRequestInterceptor {
         @Override
@@ -78,13 +98,6 @@ public class HttpClientConfig {
                             toolCount, bodyStr.contains("\"tool_choice\"") ? "已设置" : "未设置");
                 } else {
                     log.debug("请求中没有 tools 参数（非工具调用请求）");
-                }
-
-                // 完整请求体日志（诊断用，确认问题后可移除或降级为 DEBUG）
-                log.debug("===== 完整请求体（共 {} 字符）=====", bodyStr.length());
-                for (int i = 0; i < bodyStr.length(); i += 2000) {
-                    int end = Math.min(i + 2000, bodyStr.length());
-                    log.debug("请求体[{}-{}]: {}", i, end, bodyStr.substring(i, end));
                 }
             }
 
