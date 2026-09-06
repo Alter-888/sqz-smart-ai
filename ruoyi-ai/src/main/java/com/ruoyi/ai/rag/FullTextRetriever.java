@@ -2,7 +2,6 @@ package com.ruoyi.ai.rag;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -27,14 +26,15 @@ import java.util.Map;
  * 5) 降级：全文路异常时返回空列表，不能让这一路拖垮整轮对话。
  */
 @Component
-@RequiredArgsConstructor
 public class FullTextRetriever implements Retriever {
 
     private static final Logger log = LoggerFactory.getLogger(FullTextRetriever.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
-
-    @Qualifier("pgVectorJdbcTemplate")
     private final JdbcTemplate pgJdbc;
+
+    public FullTextRetriever(@Qualifier("pgVectorJdbcTemplate") JdbcTemplate pgJdbc) {
+        this.pgJdbc = pgJdbc;
+    }
 
     @Override
     public List<ScoredDoc> retrieve(String query, List<String> categories, int topK) {
