@@ -4,6 +4,7 @@ import com.ruoyi.ai.config.SmartCsProperties;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.List;
  * P2~P4 阶段 fullTextEnabled=false，只走向量路 + 直通重排。
  */
 @Service
+@ConditionalOnProperty(name = "smart-cs.eval.legacy-retrieval", havingValue = "false", matchIfMissing = true)
 @RequiredArgsConstructor
 public class HybridRagRetrievalService implements RagRetrievalService {
 
