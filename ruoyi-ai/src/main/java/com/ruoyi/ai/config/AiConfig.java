@@ -1,6 +1,6 @@
 package com.ruoyi.ai.config;
 
-import com.ruoyi.ai.advisor.RagSourceCapturingAdvisor;
+import com.ruoyi.ai.advisor.HybridRagAdvisor;
 import com.ruoyi.ai.mcp.OrderMcpTools;
 import com.ruoyi.ai.mcp.ProductMcpTools;
 import com.ruoyi.ai.mcp.TicketMcpTools;
@@ -10,13 +10,9 @@ import com.ruoyi.ai.mcp.ReviewMcpTools;
 import com.ruoyi.ai.mcp.CartMcpTools;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
-import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -53,7 +49,7 @@ public class AiConfig {
     @Bean
     public ChatClient chatClient(
             ChatClient.Builder builder,
-            VectorStore vectorStore,
+            HybridRagAdvisor hybridRagAdvisor,
             ChatMemory chatMemory,
             ToolCallbackProvider toolCallbackProvider) {
 
@@ -145,27 +141,11 @@ public class AiConfig {
                 当前对话用户的ID是: {userId}
                 """;
 
-        String ragPromptTemplate = """
-                用户问题：{query}
-
-                以下是从知识库中检索到的参考信息：
-                {question_answer_context}
-
-                回答要求：
-                1. 如果参考信息包含与问题直接相关的政策、规格、售后条款，优先引用该信息回答
-                2. 如果参考信息为空或与问题无关，忽略参考信息，根据工具查询结果或通用知识回答
-                3. 回答中不要出现"知识库"、"参考信息"、"系统显示"等内部术语
-                """;
-
         return builder
                 .defaultSystem(systemPrompt)
                 .defaultAdvisors(
-                        new RagSourceCapturingAdvisor(vectorStore, 3, 0.5),
                         MessageChatMemoryAdvisor.builder(chatMemory).build(),
-                        QuestionAnswerAdvisor.builder(vectorStore)
-                                .searchRequest(SearchRequest.builder().topK(3).similarityThreshold(0.5).build())
-                                .promptTemplate(new PromptTemplate(ragPromptTemplate))
-                                .build()
+                        hybridRagAdvisor
                 )
                 .defaultToolCallbacks(toolCallbackProvider)
                 .build();

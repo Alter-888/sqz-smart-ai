@@ -12,7 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ChatClientResponse;
-import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.context.event.EventListener;
@@ -230,11 +229,6 @@ public class ChatService {
                         .user(message)
                         .advisors(a -> {
                             a.param(ChatMemory.CONVERSATION_ID, sessionId.toString());
-                            String filter = detectCategoryFilter(message);
-                            if (filter != null) {
-                                a.param(QuestionAnswerAdvisor.FILTER_EXPRESSION, filter);
-                                log.info("RAG 分类过滤: {}", filter);
-                            }
                         })
                         .call()
                         .content();
