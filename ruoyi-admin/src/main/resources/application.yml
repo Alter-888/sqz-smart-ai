@@ -194,7 +194,7 @@ smart-cs:
   rag:
     similarity-threshold: 0.4
     vector-top-k: 20
-    full-text-enabled: false         # P5 打开
+    full-text-enabled: true          # P5 打开（需先执行 sql/2026-09-06 GIN 索引脚本）；若拖慢可回 false
     full-text-top-k: 20
     rrf-k: 60
     fusion-top-k: 8

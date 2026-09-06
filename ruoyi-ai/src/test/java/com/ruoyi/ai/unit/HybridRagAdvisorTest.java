@@ -23,6 +23,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.SimpleVectorStore;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.HashMap;
 import java.util.List;
@@ -73,7 +74,7 @@ class HybridRagAdvisorTest {
         SmartCsProperties props = new SmartCsProperties();
         RagRetrievalService svc = new HybridRagRetrievalService(
                 new VectorRetriever(store, props),
-                new FullTextRetriever(),
+                new FullTextRetriever(mock(JdbcTemplate.class)),
                 new PassThroughReranker(),
                 props);
 
