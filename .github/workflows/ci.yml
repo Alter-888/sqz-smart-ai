@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest        # 自带 Docker，Testcontainers 可直接用
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'      # 与根 pom 的 java.version 一致
+          distribution: 'temurin'
+          cache: maven            # 不加这行每次重下依赖，很慢
+      # 目前只跑纯单测（mvn -B test），不启动 Spring 上下文、不连 MySQL/PG、不调真实模型，保证绿标稳定。
+      # 等 it/ 集成测试出现后，改成 mvn -B verify，并按 07 §14.4 补 MySQL services / Testcontainers。
+      - name: 单元测试
+        run: mvn -B test
+        env:
+          # 只给假 key，让未来 @SpringBootTest 上下文能起来；绝对不填真实 DASHSCOPE key，否则 CI 会烧真模型。
+          DASHSCOPE_API_KEY: dummy-for-ci
+          PG_PWD: dummy-for-ci-pg
