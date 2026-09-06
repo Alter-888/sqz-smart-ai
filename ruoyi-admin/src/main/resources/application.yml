@@ -151,7 +151,7 @@ spring.ai:
     chat:
       options:
         # model: qwen3.5-plus
-        model: qwen3.5-plus-2026-02-15
+        model: qwen3.7-flash
         temperature: 0.7
         max-tokens: 2048
     embedding:
