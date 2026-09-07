@@ -57,6 +57,10 @@
            <ProductCard v-if="mergedProductItems.length > 0" :items="mergedProductItems" />
            <OrderCard v-if="mergedOrderItems.length > 0" :items="mergedOrderItems" />
 
+           <!-- P7: 高危操作人工确认卡片（内嵌气泡） -->
+           <PendingConfirmCard v-for="pa in mergedPendingActions" :key="pa.actionId" :item="pa" />
+           <CheckoutActionCard v-for="(ca, idx) in mergedCheckoutActions" :key="idx" :item="ca" />
+
            <!-- RAG 参考来源（可折叠，放在卡片之后） -->
            <div v-if="message.ragSources && message.ragSources.length > 0" class="rag-sources">
              <div class="rag-sources-header" @click="ragExpanded = !ragExpanded">
@@ -118,6 +122,8 @@ import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import ProductCard from './ProductCard.vue'
 import OrderCard from './OrderCard.vue'
+import PendingConfirmCard from './PendingConfirmCard.vue'
+import CheckoutActionCard from './CheckoutActionCard.vue'
 
 const props = defineProps({
   message: { type: Object, required: true },
@@ -167,6 +173,20 @@ const mergedProductItems = computed(() => {
   if (!props.message.cards || props.message.cards.length === 0) return []
   return props.message.cards
     .filter(card => card.cardType === 'product')
+    .flatMap(card => card.items || [])
+})
+
+const mergedPendingActions = computed(() => {
+  if (!props.message.cards || props.message.cards.length === 0) return []
+  return props.message.cards
+    .filter(card => card.cardType === 'pending_action')
+    .flatMap(card => card.items || [])
+})
+
+const mergedCheckoutActions = computed(() => {
+  if (!props.message.cards || props.message.cards.length === 0) return []
+  return props.message.cards
+    .filter(card => card.cardType === 'checkout_action')
     .flatMap(card => card.items || [])
 })
 

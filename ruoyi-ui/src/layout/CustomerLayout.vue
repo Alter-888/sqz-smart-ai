@@ -556,9 +556,12 @@ async function submitCheckout() {
       productId: item.productId,
       quantity: item.quantity
     }))
-    await createOrder({ address: addressStr, remark: checkoutForm.value.remark, items })
+    const res = await createOrder({ address: addressStr, remark: checkoutForm.value.remark, items })
+    const order = res.data || res
     await cartStore.clearChecked()
     checkoutVisible.value = false
+    // 通知聊天「去结算」卡变为已完成
+    window.dispatchEvent(new CustomEvent('sqz-checkout-completed', { detail: { orderNo: order.orderNo || '', status: 'PENDING' } }))
     ElMessage.success('订单提交成功，请前往我的订单完成支付')
     router.push('/customer/orders')
   } catch (e) {
@@ -583,6 +586,8 @@ async function confirmPay() {
     // 模拟支付处理延时
     await new Promise(resolve => setTimeout(resolve, 1000))
     await myUpdateOrderStatus(order.orderId, 'PAID')
+    // 通知聊天「去结算」卡变为已完成
+    window.dispatchEvent(new CustomEvent('sqz-checkout-completed', { detail: { orderNo: order.orderNo || '', status: 'PAID' } }))
     ElMessage.success('支付成功！')
     checkoutVisible.value = false
     router.push('/customer/orders')
@@ -624,17 +629,32 @@ function onAiDataChanged(event) {
   }
 }
 
+// 从聊天「去结算」卡片触发：打开屏幕中央结算弹窗（标准电商结算流程）
+async function openCheckoutFromChat() {
+  if (cartStore.cartItems.length === 0) {
+    ElMessage.warning('购物车为空，请先添加商品')
+    return
+  }
+  // 若没有任何已勾选商品，自动全选，避免结算弹窗「去结算」不可点
+  if (cartStore.checkedItems.length === 0) {
+    await cartStore.toggleAll()
+  }
+  openCheckout()
+}
+
 onMounted(() => {
   loadUnreadCount()
   notificationTimer = setInterval(loadUnreadCount, 30000)
   window.addEventListener('cart-item-added', onCartItemAdded)
   window.addEventListener('ai-data-changed', onAiDataChanged)
+  window.addEventListener('sqz-open-checkout', openCheckoutFromChat)
 })
 
 onUnmounted(() => {
   if (notificationTimer) clearInterval(notificationTimer)
   window.removeEventListener('cart-item-added', onCartItemAdded)
   window.removeEventListener('ai-data-changed', onAiDataChanged)
+  window.removeEventListener('sqz-open-checkout', openCheckoutFromChat)
 })
 </script>
 

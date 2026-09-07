@@ -24,6 +24,7 @@ import org.springframework.stereotype.Component;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -108,7 +109,19 @@ public class CartMcpTools {
             result.put("checkedItems", summary.get("checkedItems"));
             result.put("totalPrice", summary.get("totalPrice").toString());
 
-            publishToolCallEvent("viewCart", "购物车共 " + items.size() + " 件商品");
+            // 推送"去结算"操作卡片：前端点击联动购物车结算弹窗（标准电商结算流程）
+            Map<String, Object> checkoutCard = new LinkedHashMap<>();
+            checkoutCard.put("itemCount", summary.get("totalItems"));
+            checkoutCard.put("checkedCount", summary.get("checkedItems"));
+            checkoutCard.put("totalPrice", summary.get("totalPrice").toString());
+            checkoutCard.put("productNames", items.stream()
+                    .map(i -> i.getProductName() != null ? i.getProductName() : "")
+                    .collect(Collectors.joining("、")));
+            checkoutCard.put("cardId", UUID.randomUUID().toString());
+            eventPublisher.publishEvent(new ToolCallEvent(this, "viewCart",
+                    "购物车共 " + items.size() + " 件商品，可去结算",
+                    ChatContext.getSessionId(),
+                    "checkout_action", List.of(checkoutCard), List.of("cart")));
             ChatContext.addToolCallName("viewCart");
             return result;
         } catch (Exception e) {

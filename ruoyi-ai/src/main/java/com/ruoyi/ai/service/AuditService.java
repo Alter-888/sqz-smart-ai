@@ -2,6 +2,7 @@ package com.ruoyi.ai.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruoyi.ai.agent.ChatOrchestrator;
+import com.ruoyi.ai.agent.Evaluator;
 import com.ruoyi.ai.entity.ChatTurnAudit;
 import com.ruoyi.ai.mapper.ChatTurnAuditMapper;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class AuditService {
 
     private final ChatTurnAuditMapper chatTurnAuditMapper;
     private final ObjectMapper objectMapper;
+    private final Evaluator evaluator;
 
     @Async("auditExecutor")
     public void recordTurn(Long sessionId, Long userId, String userMessage, String aiResponse,
@@ -42,14 +44,24 @@ public class AuditService {
             audit.setDurationMs(durationMs);
             audit.setHasRagHit(ragSources != null && !ragSources.isEmpty() ? 1 : 0);
 
-            // P4 埋点：意图 / 命中Agent / 路由来源 / 是否挂RAG / 重试次数
+            // P3/P4 埋点：意图 / 命中Agent / 路由来源 / 是否挂RAG / 重试 / 失败 / 超时
             if (turn != null) {
                 audit.setIntent(turn.intent());
                 audit.setAgentId(turn.agentId() == null || turn.agentId().isBlank() ? null : turn.agentId());
+                audit.setRouteSource(turn.routeSource() == null || turn.routeSource().isBlank() ? null : turn.routeSource());
+                audit.setRagEnabled(turn.ragEnabled() ? 1 : 0);
                 audit.setRetryCount(turn.retryCount());
+                audit.setFailureCount(turn.failureCount());
+                audit.setIsTimeout(turn.timeout() ? 1 : 0);
             }
 
             chatTurnAuditMapper.insert(audit);
+
+            // P7 异步抽检：审计行拿到 auditId 后再触发，避免抽检时行还不存在（竞态）
+            if (turn != null && audit.getAuditId() != null) {
+                evaluator.spotCheck(audit.getAuditId(), userMessage, aiResponse, turn, ragSources);
+            }
+
             log.debug("审计记录已写入 - sessionId: {}, hasRagHit: {}, toolCalls: {}, intent: {}",
                     sessionId, audit.getHasRagHit(), toolCallNames, audit.getIntent());
         } catch (Exception e) {

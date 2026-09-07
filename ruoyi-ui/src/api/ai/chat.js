@@ -31,3 +31,26 @@ export function renameSession(sessionId, title) {
 export function feedbackMessage(messageId, feedback) {
   return request({ url: '/ai/chat/message/' + messageId + '/feedback', method: 'put', data: { feedback } })
 }
+
+// ====== P7 HITL：高危操作确认 ======
+export function listPendingActions(status = 'PENDING') {
+  return request({ url: '/ai/chat/pending-action/list', method: 'get', params: { status } })
+}
+
+export function confirmPendingAction(actionId) {
+  return request({ url: '/ai/chat/pending-action/' + actionId + '/confirm', method: 'post' })
+}
+
+export function cancelPendingAction(actionId) {
+  return request({ url: '/ai/chat/pending-action/' + actionId + '/cancel', method: 'post' })
+}
+
+// 确认/取消/超时后，把消息里确认卡的最终状态持久化（刷新页面仍显示最终态）
+export function updatePendingCardState(sessionId, actionId, status, result) {
+  return request({ url: '/ai/chat/pending-action/' + actionId + '/state', method: 'put', data: { sessionId, status, result } })
+}
+
+// 结算成功后，把消息里「去结算」卡的完成态持久化（刷新页面仍显示已完成）
+export function updateCheckoutCardState(sessionId, cardId, status, orderNo) {
+  return request({ url: '/ai/chat/checkout-card/' + cardId + '/state', method: 'put', data: { sessionId, status, orderNo } })
+}

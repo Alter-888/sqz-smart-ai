@@ -16,12 +16,6 @@
         <el-empty description="请选择或新建一个对话" />
       </div>
       <template v-else>
-        <!-- P4: 意图路由提示条（路由一出结果立刻显示"导购助手正在处理…"） -->
-        <div v-if="agentProcessing" class="agent-processing-bar">
-          <span class="agent-dot"></span>
-          <span>导购助手正在处理…</span>
-          <el-tag v-if="currentAgentLabel" size="small" type="info" effect="plain">{{ currentAgentLabel }}</el-tag>
-        </div>
         <MessageList
           ref="messageListRef"
           :messages="messages"
@@ -37,6 +31,7 @@
           @stop="handleStop"
         />
       </template>
+
     </div>
   </div>
 </template>
@@ -61,22 +56,7 @@ const { isStreaming, startStream, stopStream } = useSSE()
 const isLoadingApi = ref(false)
 const isLoading = computed(() => isStreaming.value || isLoadingApi.value)
 
-// ====== P4: 意图路由处理提示 ======
-const agentProcessing = ref(false)
-const currentAgentLabel = ref('')
-const AGENT_LABELS = {
-  'sales-advisor': '商品导购',
-  'order-service': '订单专员',
-  'after-sales': '售后处理',
-  account: '账户助理',
-  knowledge: '政策顾问'
-}
-function handleIntent(intentData) {
-  if (intentData && intentData.agentId) {
-    agentProcessing.value = true
-    currentAgentLabel.value = AGENT_LABELS[intentData.agentId] || intentData.agentId
-  }
-}
+
 
 const messageListRef = ref(null)
 const messageInputRef = ref(null)
@@ -134,6 +114,7 @@ function stopTyping() {
 
 onBeforeUnmount(() => {
   stopTyping()
+
 })
 
 // ====== 会话切换 ======
@@ -194,13 +175,11 @@ function doSend(text) {
     },
     () => {
       // onDone - 标记工具提示完成
-      agentProcessing.value = false
       chatStore.markToolCallHintsDone()
     },
     async () => {
       // onError - 降级为非流式
       stopTyping()
-      agentProcessing.value = false
       isLoadingApi.value = true
       try {
         chatStore.removeLastMessage()
@@ -223,9 +202,8 @@ function doSend(text) {
         isLoadingApi.value = false
       }
     },
-    (intentData) => {
-      // P4: 路由一出结果立刻显示"导购助手正在处理…"
-      handleIntent(intentData)
+    () => {
+      // 意图事件只用于路由分析，状态已融合进气泡工具调用区，不再渲染顶部条
     },
     (toolCallData) => {
       chatStore.addToolCallHint(toolCallData)
@@ -245,7 +223,8 @@ function doSend(text) {
     (messageIdData) => {
       // 后端返回assistant消息ID，供赞/踩功能使用
       chatStore.setLastAssistantMessageId(messageIdData.messageId)
-    }
+    },
+    () => {}
   )
 }
 
@@ -313,30 +292,6 @@ watch(currentSessionId, (newVal) => {
   position: relative;
   background-color: #f7f8fa;
 }
-.agent-processing-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  margin: 8px 16px 0;
-  background: #f0f6ff;
-  border: 1px solid #d6e4ff;
-  border-radius: 8px;
-  color: #409eff;
-  font-size: 13px;
-}
-.agent-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #409eff;
-  animation: agentPulse 1s ease-in-out infinite;
-}
-@keyframes agentPulse {
-  0%, 100% { opacity: 0.3; transform: scale(0.9); }
-  50% { opacity: 1; transform: scale(1.1); }
-}
-
 
 .sidebar-expand-btn {
   position: absolute;
@@ -372,4 +327,5 @@ watch(currentSessionId, (newVal) => {
   color: #a0a3ab;
   font-size: 15px;
 }
+
 </style>

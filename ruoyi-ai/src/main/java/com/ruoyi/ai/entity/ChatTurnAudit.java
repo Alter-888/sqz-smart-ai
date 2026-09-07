@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -45,6 +46,18 @@ public class ChatTurnAudit {
 
     /** 重试次数（P4） */
     private Integer retryCount;
+
+    /** 重试耗尽失败次数（P3）：0=成功，>0=失败 */
+    private Integer failureCount;
+
+    /** 是否超时失败（P3）：1=是 0=否 */
+    private Integer isTimeout;
+
+    /** 异步抽检得分（P3/P7）：0~5，未抽到为 NULL */
+    private BigDecimal evalScore;
+
+    /** 异步抽检理由（P3/P7）：排查用 */
+    private String evalReason;
 
     /** 是否命中RAG: 1是 0否 */
     private Integer hasRagHit;

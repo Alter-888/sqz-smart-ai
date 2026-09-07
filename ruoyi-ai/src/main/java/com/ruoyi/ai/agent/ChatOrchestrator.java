@@ -30,14 +30,13 @@ public class ChatOrchestrator {
     private final IntentRouter router;
     private final AgentRegistry registry;
     private final SupervisorAgent supervisor;
-    private final Evaluator evaluator;
     private final CommonMcpTools commonMcpTools;
     private final RetryTemplate aiRetryTemplate;
     private final SmartCsProperties props;
     private final ObjectMapper objectMapper;
 
     /** 一轮对话的全部可观测结果，字段与 ai_chat_turn_audit 一一对应 */
-    public record TurnResult(String text, String intent, String agentId, boolean ragEnabled,
+    public record TurnResult(String text, String intent, String routeSource, String agentId, boolean ragEnabled,
                              List<String> toolCalls, int retryCount, int failureCount,
                              boolean timeout, long durationMs) {}
 
@@ -95,8 +94,7 @@ public class ChatOrchestrator {
                 result == null ? List.of() : result.toolCalls(),
                 retries.get(), failures.get(), timeout.get(), start);
 
-        // ④ 异步抽检（P7 实现）：采样率之外的轮次直接跳过，命中的也不阻塞本轮回复
-        evaluator.spotCheckAsync(message, turn, ChatContext.getRagSources());
+        // ④ 异步抽检已下沉到 AuditService：审计行拿到 auditId 后再触发（P7）
         return turn;
     }
 
@@ -104,7 +102,7 @@ public class ChatOrchestrator {
                             List<String> toolCalls, int retryCount, int failureCount,
                             boolean timeout, long start) {
         return new TurnResult(text, d.intent().name(),
-                d.agentId() == null ? "" : d.agentId(), ragEnabled,
+                d.source(), d.agentId() == null ? "" : d.agentId(), ragEnabled,
                 toolCalls, retryCount, failureCount, timeout,
                 System.currentTimeMillis() - start);
     }

@@ -5,7 +5,7 @@ export function useSSE() {
   const isStreaming = ref(false)
   let eventSource = null
 
-  async function startStream(message, sessionId, onMessage, onDone, onError, onIntent, onToolCall, onCardData, onRagSource, onDataChanged, onMessageId) {
+  async function startStream(message, sessionId, onMessage, onDone, onError, onIntent, onToolCall, onCardData, onRagSource, onDataChanged, onMessageId, onPendingAction) {
     isStreaming.value = true
     let hasReceivedData = false
 
@@ -114,6 +114,18 @@ export function useSSE() {
           onMessageId(data)
         } catch (e) {
           console.warn('解析消息ID事件失败', e)
+        }
+      }
+    })
+
+    // 监听高危操作待确认事件（P7 HITL：渲染确认卡片）
+    eventSource.addEventListener('pending_action', (event) => {
+      if (event.data && onPendingAction) {
+        try {
+          const data = JSON.parse(event.data)
+          onPendingAction(data)
+        } catch (e) {
+          console.warn('解析待确认操作事件失败', e)
         }
       }
     })

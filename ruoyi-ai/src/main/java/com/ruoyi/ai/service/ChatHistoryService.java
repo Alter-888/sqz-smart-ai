@@ -1,6 +1,9 @@
 package com.ruoyi.ai.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ruoyi.ai.entity.ChatMessage;
 import com.ruoyi.ai.entity.ChatSession;
@@ -9,6 +12,8 @@ import com.ruoyi.ai.mapper.ChatSessionMapper;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.stereotype.Service;
 
@@ -19,9 +24,12 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class ChatHistoryService {
 
+    private static final Logger log = LoggerFactory.getLogger(ChatHistoryService.class);
+
     private final ChatSessionMapper chatSessionMapper;
     private final ChatMessageMapper chatMessageMapper;
     private final ChatMemory chatMemory;
+    private final ObjectMapper objectMapper;
 
     public ChatSession createSession(Long userId, String title) {
         ChatSession session = new ChatSession();
@@ -120,6 +128,110 @@ public class ChatHistoryService {
         if (lastMsg != null) {
             lastMsg.setCardsData(cardsData);
             chatMessageMapper.updateById(lastMsg);
+        }
+    }
+
+    /**
+     * 更新最近一条 assistant 消息的工具调用（供前端刷新后恢复工具调用提示）
+     */
+    public void updateLastMessageToolCalls(Long sessionId, String toolCalls) {
+        LambdaQueryWrapper<ChatMessage> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ChatMessage::getSessionId, sessionId)
+               .eq(ChatMessage::getRole, "assistant")
+               .orderByDesc(ChatMessage::getCreateTime)
+               .last("LIMIT 1");
+        ChatMessage lastMsg = chatMessageMapper.selectOne(wrapper);
+        if (lastMsg != null) {
+            lastMsg.setToolCalls(toolCalls);
+            chatMessageMapper.updateById(lastMsg);
+        }
+    }
+
+
+    /**
+     * 更新某条待确认卡在 cards_data 里的状态（确认/取消/超时后刷新页面也能恢复到最终态）
+     */
+    public void updatePendingCardState(Long sessionId, Long actionId, String status, String result) {
+        // 扫描该会话最近的 assistant 消息，找到真正包含此待确认卡的卡片（防止中途又发消息导致卡不在最后一条）
+        LambdaQueryWrapper<ChatMessage> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ChatMessage::getSessionId, sessionId)
+               .eq(ChatMessage::getRole, "assistant")
+               .orderByDesc(ChatMessage::getCreateTime)
+               .last("LIMIT 200");
+        List<ChatMessage> msgs = chatMessageMapper.selectList(wrapper);
+        for (ChatMessage msg : msgs) {
+            if (msg.getCardsData() == null || msg.getCardsData().isBlank()) {
+                continue;
+            }
+            try {
+                JsonNode root = objectMapper.readTree(msg.getCardsData());
+                if (!root.isArray()) {
+                    continue;
+                }
+                boolean found = false;
+                for (JsonNode card : root) {
+                    if ("pending_action".equals(card.path("cardType").asText()) && card.path("items").isArray()) {
+                        for (JsonNode item : card.path("items")) {
+                            if (item.path("actionId").asLong() == actionId && item instanceof ObjectNode obj) {
+                                obj.put("status", status);
+                                obj.put("result", result == null ? "" : result);
+                                found = true;
+                            }
+                        }
+                    }
+                }
+                if (found) {
+                    msg.setCardsData(objectMapper.writeValueAsString(root));
+                    chatMessageMapper.updateById(msg);
+                    return;
+                }
+            } catch (Exception e) {
+                log.warn("解析消息卡片数据失败 - messageId: {}", msg.getMessageId(), e);
+            }
+        }
+    }
+
+    /**
+     * 更新某条「去结算」卡在 cards_data 里的完成态（结算成功后刷新页面仍显示已完成）
+     */
+    public void updateCheckoutCardState(Long sessionId, String cardId, String status, String orderNo) {
+        // 扫描该会话最近的 assistant 消息，找到真正包含此去结算卡的卡片
+        LambdaQueryWrapper<ChatMessage> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ChatMessage::getSessionId, sessionId)
+               .eq(ChatMessage::getRole, "assistant")
+               .orderByDesc(ChatMessage::getCreateTime)
+               .last("LIMIT 200");
+        List<ChatMessage> msgs = chatMessageMapper.selectList(wrapper);
+        for (ChatMessage msg : msgs) {
+            if (msg.getCardsData() == null || msg.getCardsData().isBlank()) {
+                continue;
+            }
+            try {
+                JsonNode root = objectMapper.readTree(msg.getCardsData());
+                if (!root.isArray()) {
+                    continue;
+                }
+                boolean found = false;
+                for (JsonNode card : root) {
+                    if ("checkout_action".equals(card.path("cardType").asText()) && card.path("items").isArray()) {
+                        for (JsonNode item : card.path("items")) {
+                            if (cardId.equals(item.path("cardId").asText()) && item instanceof ObjectNode obj) {
+                                obj.put("completed", true);
+                                obj.put("status", status == null ? "" : status);
+                                obj.put("orderNo", orderNo == null ? "" : orderNo);
+                                found = true;
+                            }
+                        }
+                    }
+                }
+                if (found) {
+                    msg.setCardsData(objectMapper.writeValueAsString(root));
+                    chatMessageMapper.updateById(msg);
+                    return;
+                }
+            } catch (Exception e) {
+                log.warn("解析消息卡片数据失败 - messageId: {}", msg.getMessageId(), e);
+            }
         }
     }
 

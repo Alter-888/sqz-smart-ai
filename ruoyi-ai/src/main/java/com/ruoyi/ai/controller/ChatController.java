@@ -3,6 +3,7 @@ package com.ruoyi.ai.controller;
 import com.ruoyi.ai.entity.ChatMessage;
 import com.ruoyi.ai.entity.ChatSession;
 import com.ruoyi.ai.service.ChatHistoryService;
+import com.ruoyi.ai.service.PendingActionService;
 import com.ruoyi.ai.service.ChatService;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.domain.model.LoginUser;
@@ -24,6 +25,7 @@ public class ChatController {
 
     private final ChatService chatService;
     private final ChatHistoryService chatHistoryService;
+    private final PendingActionService pendingActionService;
 
     /**
      * 获取 SSE 流式对话的一次性 ticket
@@ -183,5 +185,69 @@ public class ChatController {
         Long userId = SecurityUtils.getUserId();
         chatHistoryService.updateFeedback(messageId, feedback, userId);
         return AjaxResult.success();
+    }
+
+    /**
+     * P7 HITL：确认高危操作（02 §13.4 / 04 §1.3）
+     */
+    @PostMapping("/pending-action/{id}/confirm")
+    public AjaxResult confirmPendingAction(@PathVariable("id") Long actionId) {
+        Map<String, Object> result = pendingActionService.confirm(actionId);
+        return AjaxResult.success("操作已执行", result);
+    }
+
+    /**
+     * P7 HITL：取消高危操作，不执行
+     */
+    @PostMapping("/pending-action/{id}/cancel")
+    public AjaxResult cancelPendingAction(@PathVariable("id") Long actionId) {
+        Map<String, Object> result = pendingActionService.cancel(actionId);
+        return AjaxResult.success("操作已取消", result);
+    }
+
+
+    /**
+     * P7 HITL：确认/取消/超时后，把消息里确认卡的最终状态持久化到 cards_data（刷新页面仍显示最终态）
+     */
+    @PutMapping("/pending-action/{id}/state")
+    public AjaxResult updatePendingCardState(@PathVariable("id") Long actionId,
+                                             @RequestBody Map<String, Object> body) {
+        Long sessionId = body.get("sessionId") == null ? null : Long.valueOf(body.get("sessionId").toString());
+        String status = body.get("status") == null ? "" : body.get("status").toString();
+        String result = body.get("result") == null ? "" : body.get("result").toString();
+        if (sessionId == null) {
+            return AjaxResult.error("会话ID不能为空");
+        }
+        Long userId = SecurityUtils.getUserId();
+        chatHistoryService.validateSessionOwnership(sessionId, userId);
+        chatHistoryService.updatePendingCardState(sessionId, actionId, status, result);
+        return AjaxResult.success();
+    }
+
+    /**
+     * P7 购物车「去结算」卡：结算成功后把完成态持久化到 cards_data（刷新页面仍显示已完成）
+     */
+    @PutMapping("/checkout-card/{cardId}/state")
+    public AjaxResult updateCheckoutCardState(@PathVariable("cardId") String cardId,
+                                              @RequestBody Map<String, Object> body) {
+        Long sessionId = body.get("sessionId") == null ? null : Long.valueOf(body.get("sessionId").toString());
+        String status = body.get("status") == null ? "" : body.get("status").toString();
+        String orderNo = body.get("orderNo") == null ? "" : body.get("orderNo").toString();
+        if (sessionId == null) {
+            return AjaxResult.error("会话ID不能为空");
+        }
+        Long userId = SecurityUtils.getUserId();
+        chatHistoryService.validateSessionOwnership(sessionId, userId);
+        chatHistoryService.updateCheckoutCardState(sessionId, cardId, status, orderNo);
+        return AjaxResult.success();
+    }
+
+    /**
+     * P7 HITL：查自己的待确认操作（页面刷新后恢复卡片）
+     */
+    @GetMapping("/pending-action/list")
+    public AjaxResult listPendingActions(
+            @RequestParam(value = "status", required = false) String status) {
+        return AjaxResult.success(pendingActionService.listPending(status));
     }
 }

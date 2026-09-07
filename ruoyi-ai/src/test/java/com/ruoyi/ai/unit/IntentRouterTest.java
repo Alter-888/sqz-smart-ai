@@ -131,7 +131,11 @@ class IntentRouterTest {
         "'改一下收货地址', ACCOUNT",
         "'我要找真人客服', HUMAN_HANDOFF",
         "'我想买个手机，顺便查一下昨天的订单', CROSS_DOMAIN",
-        "'商品保修多长时间？', AFTERSALES"
+        "'商品保修多长时间？', AFTERSALES",
+        "'确认', PRODUCT",
+        "'运动监测', PRODUCT",
+        "'确认收货', ORDER",
+        "'确认退款', AFTERSALES"
     })
     @DisplayName("P6: 黄金集误路由根因修复后逐条正确落域")
     void p6GoldenMisrouteFixed(String message, Intent expected) {

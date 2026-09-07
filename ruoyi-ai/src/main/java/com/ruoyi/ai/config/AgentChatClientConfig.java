@@ -2,6 +2,7 @@ package com.ruoyi.ai.config;
 
 import com.ruoyi.ai.advisor.HybridRagAdvisor;
 import com.ruoyi.ai.agent.IntentRouter;
+import com.ruoyi.ai.mcp.AgentDelegateTools;
 import com.ruoyi.ai.mcp.CommonMcpTools;
 import com.ruoyi.ai.mcp.OrderMcpTools;
 import com.ruoyi.ai.mcp.ProductMcpTools;
@@ -120,6 +121,46 @@ public class AgentChatClientConfig {
                 .defaultSystem(AgentPrompts.KNOWLEDGE)
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(memory).build(), rag)
                 .defaultToolCallbacks(tools(common))
+                .build();
+    }
+
+    @Bean("supervisorClient")
+    public ChatClient supervisorClient(ChatClient.Builder builder, ChatMemory memory,
+                                       AgentDelegateTools delegates) {
+        log.info("初始化 Supervisor ChatClient - model: {}", props.getModel().getWorker());
+        return builder
+                .defaultOptions(workerOptions())
+                .defaultSystem("""
+                        你是客服调度员。用户的一句话里包含多个不同领域的请求时，
+                        你把它拆成子任务，依次调用对应的助手工具，最后把各助手的回复
+                        整合成一段连贯的中文回复给用户。
+                        规则：
+                        1. 每个子任务只调用一次对应助手，不要重复调用同一个助手
+                        2. 最多调用 3 个助手；超出就先回答已完成的部分，并说明剩下的请用户再问一次
+                        3. 不要自己编造商品、订单、政策信息，这些只能来自助手的返回
+                        4. 整合时不要出现“助手A说”“调度”等内部术语
+                        """)
+                .defaultAdvisors(MessageChatMemoryAdvisor.builder(memory).build())
+                .defaultToolCallbacks(tools(delegates))
+                .build();
+    }
+
+    @Bean("judgeClient")
+    public ChatClient judgeClient(ChatClient.Builder builder) {
+        // 异步抽检评估器：无工具、无 RAG、无记忆，只看“问题+回答+参考资料”打分
+        log.info("初始化 judge ChatClient - model: {}", props.getModel().getJudge());
+        return builder
+                .defaultOptions(OpenAiChatOptions.builder()
+                        .model(props.getModel().getJudge())
+                        .temperature(0.0)
+                        .maxTokens(512)
+                        .build())
+                .defaultSystem("""
+                        你是客服回答质量评估器。只输出 JSON，不要输出其他内容，不要用 markdown 代码块。
+                        输出格式：{"supportScore":整数0-5,"answerScore":整数0-5,"reason":"一句话中文理由"}
+                        supportScore：助手回答是否被提供的参考资料支持；没有参考资料时，判断是否与业务事实一致。
+                        answerScore：助手回答是否完整覆盖用户问题。
+                        """)
                 .build();
     }
 

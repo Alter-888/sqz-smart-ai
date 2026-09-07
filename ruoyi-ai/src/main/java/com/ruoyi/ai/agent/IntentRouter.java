@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import com.ruoyi.common.exception.ServiceException;
 import java.util.regex.Pattern;
 
 /**
@@ -34,6 +35,17 @@ public class IntentRouter {
         public final String agentId;
         /** 该域允许检索的知识类别；空列表 = 不挂 RAG（order-service / account 就是空） */
         public final List<String> ragCategories;
+
+        /** agentId → Intent 反查。委派工具只知道 agentId，需要靠它拿回 ragCategories */
+        public static Intent byAgentId(String agentId) {
+            for (Intent i : values()) {
+                if (agentId != null && agentId.equals(i.agentId)) {
+                    return i;
+                }
+            }
+            throw new ServiceException("未知 agentId: " + agentId);
+        }
+
         Intent(String agentId, List<String> ragCategories) {
             this.agentId = agentId;
             this.ragCategories = ragCategories;
@@ -79,7 +91,9 @@ public class IntentRouter {
         Map.entry(Intent.PRODUCT, Pattern.compile(
             "推荐|买|购买|多少钱|价格|性价比|对比|参数|配置|库存|购物车|加购|结算|报价|" +
             "怎么样|好用吗|评价|口碑|卖点|亮点|值得买|续航|电池|屏幕|拍照|颜色|白色|黑色|蓝色|容量|尺寸|现货|有货|" +
-            "哪个好|哪个更好|哪个值得买|NFC|公交卡|血氧|心率"))
+            "哪个好|哪个更好|哪个值得买|NFC|公交卡|血氧|心率|运动监测|运动模式|步数|睡眠监测|" +
+            // 短确认词：避免"确认/确定/同意/是的/没问题"被 LLM 误判成知识问答而落到只有转人工工具的 knowledge
+            "确认|确定|同意|是的|没问题"))
     );
 
     private final ChatClient routerClient;

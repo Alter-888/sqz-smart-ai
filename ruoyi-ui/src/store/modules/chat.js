@@ -1,6 +1,51 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
+const TOOL_HINT_LABELS = {
+  searchProducts: '正在搜索商品...',
+  recommendProducts: '正在为您推荐商品...',
+  getProductDetail: '查询商品详情',
+  compareProducts: '正在对比商品',
+  getProductReviews: '正在查询商品评价',
+  viewCart: '查看购物车',
+  addToCart: '加入购物车',
+  updateCartQuantity: '更新购物车数量',
+  removeFromCart: '移除商品',
+  clearCart: '清空购物车',
+  checkoutFromCart: '结算下单',
+  queryOrder: '查询订单',
+  queryUserOrders: '查询订单列表',
+  queryLogistics: '查询物流',
+  cancelOrder: '取消订单',
+  payOrder: '支付订单',
+  confirmReceive: '确认收货',
+  createTicket: '创建工单',
+  queryTicket: '查询工单',
+  queryUserTickets: '查询工单列表',
+  replyTicket: '回复工单',
+  closeTicket: '关闭工单',
+  submitProductReview: '提交评价',
+  checkReviewStatus: '查询评价资格',
+  queryMyReviews: '查询我的评价',
+  queryUserInfo: '查询个人资料',
+  queryUserAddresses: '查询收货地址',
+  queryDefaultAddress: '查询默认地址',
+  addAddress: '新增收货地址',
+  updateAddress: '修改收货地址',
+  deleteAddress: '删除收货地址',
+  setDefaultAddress: '设为默认地址',
+  queryUnreadNotifications: '查询未读通知',
+  getUnreadCount: '查询未读数',
+  markNotificationRead: '标记通知已读',
+  markAllNotificationsRead: '全部已读',
+  queryNotificationHistory: '查询通知历史',
+  escalateToHuman: '转人工客服'
+}
+
+function toolHintLabel(name) {
+  return TOOL_HINT_LABELS[name] || ('调用工具：' + name)
+}
+
 const useChatStore = defineStore('chat', () => {
   const currentSessionId = ref(null)
   const sessions = ref([])
@@ -19,6 +64,19 @@ const useChatStore = defineStore('chat', () => {
       if (msg.cardsData) {
         try {
           msg.cards = JSON.parse(msg.cardsData)
+        } catch (e) { /* ignore */ }
+      }
+      // 历史消息恢复工具调用提示：toolCalls 是后端持久化的工具名数组
+      if (msg.toolCalls) {
+        try {
+          const names = JSON.parse(msg.toolCalls)
+          if (Array.isArray(names) && names.length > 0) {
+            msg.toolCallHints = names.map(name => ({
+              toolName: name,
+              content: toolHintLabel(name),
+              done: true
+            }))
+          }
         } catch (e) { /* ignore */ }
       }
       return msg

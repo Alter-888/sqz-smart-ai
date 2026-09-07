@@ -89,6 +89,13 @@ public class ChatService {
                     chatHistoryService.updateLastMessageCardsData(sessionId, cardsJson);
                 }
 
+                // 持久化工具调用到最近的 assistant 消息（供刷新/切会话后恢复工具调用提示）
+                List<String> toolCallNames = turn == null ? List.of() : turn.toolCalls();
+                if (!toolCallNames.isEmpty()) {
+                    String toolCallsJson = objectMapper.writeValueAsString(toolCallNames);
+                    chatHistoryService.updateLastMessageToolCalls(sessionId, toolCallsJson);
+                }
+
                 // 查询刚保存的 assistant 消息ID，供前端赞/踩使用
                 LambdaQueryWrapper<ChatMessage> msgIdWrapper = new LambdaQueryWrapper<>();
                 msgIdWrapper.eq(ChatMessage::getSessionId, sessionId)

@@ -1,6 +1,7 @@
 package com.ruoyi.ai.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ruoyi.ai.agent.Evaluator;
 import com.ruoyi.ai.entity.ChatTurnAudit;
 import com.ruoyi.ai.mapper.ChatTurnAuditMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +28,9 @@ class AuditServiceTest {
 
     @Mock
     private ChatTurnAuditMapper chatTurnAuditMapper;
+
+    @Mock
+    private Evaluator evaluator;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();

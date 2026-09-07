@@ -76,6 +76,37 @@
       </template>
     </el-skeleton>
 
+    <!-- ===== P3: AI 稳定性与路由分布 ===== -->
+    <div class="stability-section">
+      <el-row :gutter="16">
+        <el-col :xs="12" :sm="12" :md="6" :lg="6" v-for="card in stabilityCards" :key="card.key">
+          <div class="stability-card" :class="'stability-' + card.key">
+            <div class="stability-label">{{ card.label }}</div>
+            <div class="stability-value">{{ card.display }}</div>
+            <div class="stability-unit">{{ card.unit }}</div>
+          </div>
+        </el-col>
+      </el-row>
+      <div class="chart-panel route-panel">
+        <div class="panel-header">
+          <span class="panel-title">路由规则与意图分布</span>
+          <span class="panel-sub">规则路由覆盖率 {{ routeCoverage }}% · RAG 命中率口径：{{ ragScopeText }}</span>
+        </div>
+        <div v-if="!routeRows.length" class="no-data">暂无数据（新字段从 P4 起埋点，多聊几轮后这里会出现分布）</div>
+        <div v-else class="route-table">
+          <div class="route-row route-head">
+            <span>路由来源</span><span>意图</span><span>次数</span><span>平均耗时</span>
+          </div>
+          <div class="route-row" v-for="(row, idx) in routeRows" :key="idx">
+            <span>{{ routeSourceText(row.route_source) }}</span>
+            <span>{{ intentText(row.intent) }}</span>
+            <span>{{ row.cnt }}</span>
+            <span>{{ row.avgMs != null ? row.avgMs + ' ms' : '—' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ===== Tier 3: 业务明细 Tab ===== -->
     <div class="tier-detail">
       <div class="detail-tabs">
@@ -257,6 +288,26 @@ const feedbackRate = computed(() => {
   if (!fb || !fb.totalFeedback || fb.totalFeedback === 0) return null
   return Math.round((fb.satisfied / fb.totalFeedback) * 100)
 })
+
+// ============ P3: AI 稳定性指标 & 路由分布 ============
+const stabilityCards = computed(() => {
+  const m = aiMetrics.value
+  const fmt = (v) => (v === null || v === undefined || v === '') ? '—' : Number(v).toFixed(1)
+  return [
+    { key: 'failure', label: '失败率', display: fmt(m.failureRate) + '%', unit: '重试耗尽/系统繁忙轮次占比' },
+    { key: 'retry', label: '重试率', display: fmt(m.retryRate) + '%', unit: '发生过重试的轮次占比' },
+    { key: 'timeout', label: '超时率', display: fmt(m.timeoutRate) + '%', unit: '因超时失败的轮次占比' },
+    { key: 'p95', label: 'P95 延迟', display: (m.p95Latency || m.p95Latency === 0) ? m.p95Latency + ' ms' : '—', unit: '95% 轮次耗时低于该值' }
+  ]
+})
+const routeCoverage = computed(() => {
+  const v = aiMetrics.value.routeRuleCoverageRate
+  return v === null || v === undefined ? '—' : Number(v).toFixed(1)
+})
+const ragScopeText = computed(() => aiMetrics.value.ragHitRateScope || '仅统计挂RAG轮次(rag_enabled=1)，已排除评测流量')
+const routeRows = computed(() => aiMetrics.value.routeSourceIntentDist || [])
+const routeSourceText = (s) => ({ rule: '规则', llm: '模型', fallback: '兜底' })[s] || s || '—'
+const intentText = (i) => ({ PRODUCT: '商品', ORDER: '订单', AFTERSALES: '售后', ACCOUNT: '账户', KNOWLEDGE: '知识问答', CHITCHAT: '闲聊', HUMAN_HANDOFF: '转人工', CROSS_DOMAIN: '跨域' })[i] || i || '—'
 
 // ============ 核心统计卡片 ============
 const coreStatCards = computed(() => [
@@ -982,6 +1033,42 @@ onBeforeUnmount(() => {
   .tab-item { padding: 12px 14px; font-size: 13px; }
   .detail-content { padding: 12px; }
 }
+
+/* ==================== P3: AI 稳定性与路由分布 ==================== */
+.stability-section {
+  margin-top: 4px;
+}
+.stability-card {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  transition: transform 0.25s, box-shadow 0.25s;
+}
+.stability-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+.stability-label { font-size: 13px; color: #909399; }
+.stability-value { font-size: 26px; font-weight: 600; margin: 6px 0 2px; color: #303133; }
+.stability-failure .stability-value,
+.stability-timeout .stability-value { color: #F56C6C; }
+.stability-retry .stability-value { color: #E6A23C; }
+.stability-p95 .stability-value { color: #409EFF; }
+.stability-unit { font-size: 12px; color: #c0c4cc; }
+.route-panel { margin-bottom: 4px; }
+.panel-sub { font-size: 12px; color: #909399; margin-left: auto; padding-left: 12px; }
+.route-table { padding: 4px 16px 12px; }
+.route-row { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px dashed #f0f0f0; font-size: 13px; color: #606266; }
+.route-row > span { flex: 1; min-width: 0; }
+.route-row:last-child { border-bottom: none; }
+.route-head { color: #909399; font-weight: 500; border-bottom: 1px solid #f0f0f0; }
+@media (max-width: 768px) {
+  .stability-card { padding: 14px 16px; }
+  .stability-value { font-size: 22px; }
+  .route-table { padding: 4px 10px 8px; }
+}
 </style>
 
 <!-- 暗黑模式需要不带scoped，因为html.dark在根元素 -->
@@ -1027,5 +1114,23 @@ html.dark .dashboard-container .hot-question-item:hover {
 
 html.dark .dashboard-container .hot-text {
   color: var(--el-text-color-primary);
+}
+
+html.dark .dashboard-container .stability-card {
+  background: var(--el-bg-color-overlay);
+  box-shadow: none;
+  border: 1px solid var(--el-border-color);
+}
+html.dark .dashboard-container .stability-value {
+  color: var(--el-text-color-primary);
+}
+html.dark .dashboard-container .stability-label,
+html.dark .dashboard-container .stability-unit,
+html.dark .dashboard-container .panel-sub {
+  color: var(--el-text-color-secondary);
+}
+html.dark .dashboard-container .route-row {
+  color: var(--el-text-color-regular);
+  border-bottom-color: var(--el-border-color-lighter);
 }
 </style>
