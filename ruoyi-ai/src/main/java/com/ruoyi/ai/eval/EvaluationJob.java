@@ -78,6 +78,7 @@ public class EvaluationJob {
     private void evalOne(GoldenCase c, int k, EvalAccumulator acc) {
         // ① 路由层：规则命中零成本
         IntentRouter.RouteDecision d = router.route(c.question());
+        log.info("评测路由 - goldenId: {}, q: {}, 实际: {}({}), 期望: {}", c.goldenId(), c.question(), d.intent().name(), d.source(), c.expectIntent());
         if (StringUtils.hasText(c.expectIntent())) {
             acc.addIntent(d.intent().name().equals(c.expectIntent()));
         }

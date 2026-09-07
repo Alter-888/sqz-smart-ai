@@ -110,4 +110,32 @@ class IntentRouterTest {
         // 无连接词、无业务词 → 应落入 LLM 兜底；mock 未配置 by default 返回 null → fallback 到 KNOWLEDGE
         assertNotNull(d);
     }
+    /** P6 黄金集误路由根因复现 + 修复验证：FAQ/支付/物流/评价措辞修复后应正确落域 */
+    @ParameterizedTest
+    @CsvSource({
+        "'你们商城支持哪些支付方式？', KNOWLEDGE",
+        "'可以用信用卡付款吗？', KNOWLEDGE",
+        "'支持花呗分期吗？', KNOWLEDGE",
+        "'怎么查询我的订单？', KNOWLEDGE",
+        "'订单编号在哪里看？', KNOWLEDGE",
+        "'订单多久能发货？', KNOWLEDGE",
+        "'偏远地区发什么快递？', KNOWLEDGE",
+        "'下单后几天能到？', KNOWLEDGE",
+        "'华为 Mate 70 Pro 用户评价怎么样？', PRODUCT",
+        "'华为 Mate 70 Pro 有现货吗？', PRODUCT",
+        "'三星 Galaxy S25 Ultra 12+256GB 报价多少？', PRODUCT",
+        "'OPPO Find X8 Pro 16+256GB 屏幕怎么样？', PRODUCT",
+        "'小米手环9 NFC能刷公交卡吗？', PRODUCT",
+        "'我的快递什么时候到？', ORDER",
+        "'帮我查一下我的订单', ORDER",
+        "'改一下收货地址', ACCOUNT",
+        "'我要找真人客服', HUMAN_HANDOFF",
+        "'我想买个手机，顺便查一下昨天的订单', CROSS_DOMAIN",
+        "'商品保修多长时间？', AFTERSALES"
+    })
+    @DisplayName("P6: 黄金集误路由根因修复后逐条正确落域")
+    void p6GoldenMisrouteFixed(String message, Intent expected) {
+        IntentRouter router = new IntentRouter(mock(ChatClient.class));
+        assertEquals(expected, router.route(message).intent());
+    }
 }
