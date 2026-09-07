@@ -35,7 +35,7 @@ public class SmartCsProperties {
         private boolean hitlEnabled = true;
         /** 需要人工确认的高危工具 */
         private List<String> hitlTools =
-                List.of("cancelOrder", "payOrder", "checkoutFromCart", "clearCart");
+                List.of("cancelOrder", "payOrder", "clearCart");
     }
 
     @Data

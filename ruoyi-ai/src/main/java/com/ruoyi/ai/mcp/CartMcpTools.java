@@ -4,13 +4,8 @@ import com.ruoyi.ai.context.ChatContext;
 import com.ruoyi.ai.entity.ToolCallLog;
 import com.ruoyi.ai.event.ToolCallEvent;
 import com.ruoyi.ai.mapper.ToolCallLogMapper;
-import com.ruoyi.business.entity.Address;
 import com.ruoyi.business.entity.CartItem;
-import com.ruoyi.business.entity.Order;
-import com.ruoyi.business.entity.OrderItem;
-import com.ruoyi.business.service.AddressService;
 import com.ruoyi.business.service.CartService;
-import com.ruoyi.business.service.OrderService;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
@@ -37,8 +32,6 @@ public class CartMcpTools {
     private static final Logger log = LoggerFactory.getLogger(CartMcpTools.class);
 
     private final CartService cartService;
-    private final OrderService orderService;
-    private final AddressService addressService;
     private final ToolCallLogMapper toolCallLogMapper;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -268,91 +261,4 @@ public class CartMcpTools {
         }
     }
 
-    @Tool(description = "购物车结算下单。将购物车中已勾选的商品生成订单，使用用户的默认收货地址。当用户要求结算、下单、购买购物车中的商品时使用此工具。注意：这是一个重要操作，AI应先用 viewCart 展示待结算商品和地址，确认后再执行。")
-    public Map<String, Object> checkoutFromCart(
-            @ToolParam(description = "订单备注信息，可为空") String remark) {
-        long startTime = System.currentTimeMillis();
-        boolean success = true;
-        String errorMsg = null;
-        Long userId = SecurityUtils.getUserId();
-        log.info("工具调用 - 购物车结算下单, userId: {}", userId);
-        publishToolCallEvent("checkoutFromCart", "正在处理购物车结算...");
-        try {
-            // 1. 获取已勾选的购物车商品
-            List<CartItem> checkedItems = cartService.listCheckedItems(userId);
-            if (checkedItems.isEmpty()) {
-                ChatContext.addToolCallName("checkoutFromCart");
-                return Map.of("error", "购物车中没有已勾选的商品，请先选择要购买的商品");
-            }
-
-            // 2. 获取用户默认收货地址
-            Address defaultAddress = addressService.getDefault(userId);
-            if (defaultAddress == null) {
-                ChatContext.addToolCallName("checkoutFromCart");
-                return Map.of("error", "您尚未设置默认收货地址，请先添加收货地址");
-            }
-
-            // 3. 拼接完整地址字符串（含联系人和电话）
-            String fullAddress = (defaultAddress.getContactName() != null ? defaultAddress.getContactName() + " " : "")
-                    + (defaultAddress.getPhone() != null ? defaultAddress.getPhone() + " " : "")
-                    + (defaultAddress.getProvince() != null ? defaultAddress.getProvince() : "")
-                    + (defaultAddress.getCity() != null ? defaultAddress.getCity() : "")
-                    + (defaultAddress.getDistrict() != null ? defaultAddress.getDistrict() : "")
-                    + (defaultAddress.getDetail() != null ? defaultAddress.getDetail() : "");
-
-            // 4. CartItem 转换为 OrderItem
-            List<OrderItem> orderItems = checkedItems.stream().map(cartItem -> {
-                OrderItem oi = new OrderItem();
-                oi.setProductId(cartItem.getProductId());
-                oi.setQuantity(cartItem.getQuantity());
-                return oi;
-            }).collect(Collectors.toList());
-
-            // 5. 创建订单（含库存扣减，事务保护）
-            Order order = orderService.createOrder(userId, fullAddress, remark, orderItems);
-
-            // 6. 移除已下单的购物车商品
-            List<Long> purchasedProductIds = checkedItems.stream()
-                    .map(CartItem::getProductId)
-                    .collect(Collectors.toList());
-            cartService.removeItems(userId, purchasedProductIds);
-
-            // 7. 构造返回结果
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("orderNo", order.getOrderNo());
-            result.put("orderId", order.getOrderId());
-            result.put("totalAmount", order.getTotalAmount().toString());
-            result.put("itemCount", checkedItems.size());
-            result.put("address", fullAddress);
-            result.put("message", "下单成功！订单号: " + order.getOrderNo()
-                    + "，共 " + checkedItems.size() + " 件商品，合计 ¥" + order.getTotalAmount());
-
-            // 构造订单卡片数据，推送到前端展示
-            Map<String, Object> orderCardData = new LinkedHashMap<>();
-            orderCardData.put("orderId", order.getOrderId());
-            orderCardData.put("orderNo", order.getOrderNo());
-            orderCardData.put("totalAmount", order.getTotalAmount());
-            orderCardData.put("status", order.getStatus());
-            orderCardData.put("createTime", order.getCreateTime() != null ? order.getCreateTime().toString() : "");
-
-            Long sid = ChatContext.getSessionId();
-            eventPublisher.publishEvent(new ToolCallEvent(this, "checkoutFromCart",
-                    "下单成功，订单号: " + order.getOrderNo(), sid,
-                    "order", List.of(orderCardData), List.of("cart", "order")));
-            ChatContext.addToolCallName("checkoutFromCart");
-            return result;
-        } catch (ServiceException e) {
-            success = false;
-            errorMsg = e.getMessage();
-            ChatContext.addToolCallName("checkoutFromCart");
-            return Map.of("error", e.getMessage());
-        } catch (Exception e) {
-            success = false;
-            errorMsg = e.getMessage();
-            throw e;
-        } finally {
-            logToolCall("checkoutFromCart", "userId=" + userId + ",remark=" + remark, success,
-                    System.currentTimeMillis() - startTime, errorMsg);
-        }
-    }
 }

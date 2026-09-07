@@ -22,8 +22,7 @@ class SmartCsPropertiesTest {
         assertEquals(3, p.getAgent().getSupervisorMaxDelegations());
         assertEquals(0.1, p.getAgent().getEvalSampleRate(), 1e-9);
         assertTrue(p.getAgent().isHitlEnabled());
-        assertTrue(p.getAgent().getHitlTools().contains("checkoutFromCart"));
-        assertEquals(4, p.getAgent().getHitlTools().size());
+        assertEquals(3, p.getAgent().getHitlTools().size());
     }
 
     @Test

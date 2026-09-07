@@ -71,7 +71,6 @@ const REFRESH_TYPES = {
   cancelOrder: ['order'],
   payOrder: ['order'],
   clearCart: ['cart'],
-  checkoutFromCart: ['cart', 'order']
 }
 
 const status = computed(() => props.item.status || 'PENDING')
@@ -118,7 +117,6 @@ function buildFriendlyMessage(toolName, data) {
   const orderNo = data.orderNo || ''
   if (toolName === 'cancelOrder') return orderNo ? '订单 ' + orderNo + ' 已成功取消' : '订单已成功取消'
   if (toolName === 'payOrder') return orderNo ? '订单 ' + orderNo + ' 已支付成功' : '订单已支付成功'
-  if (toolName === 'checkoutFromCart') return orderNo ? '下单成功，订单号 ' + orderNo : '下单成功'
   if (toolName === 'clearCart') return '购物车已清空'
   return data.message || '操作已执行'
 }

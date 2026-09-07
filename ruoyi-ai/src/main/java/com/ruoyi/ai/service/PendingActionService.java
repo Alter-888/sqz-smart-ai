@@ -204,7 +204,6 @@ public class PendingActionService {
             case "cancelOrder" -> "取消订单 " + arg(args, 0);
             case "payOrder" -> "支付订单 " + arg(args, 0);
             case "clearCart" -> "清空购物车（该操作不可恢复）";
-            case "checkoutFromCart" -> "用购物车内全部商品下单";
             default -> "执行操作 " + tool;
         };
     }

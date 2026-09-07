@@ -22,7 +22,7 @@ public final class GoldenRules {
      * 与 HITL 名单重叠但不能复用：HITL 是"需用户确认的"，这份是"评测绝对不能碰的"，后者必须更宽。
      */
     public static final Set<String> FORBIDDEN_IN_GOLDEN = Set.of(
-            "cancelOrder", "payOrder", "checkoutFromCart", "clearCart",
+            "cancelOrder", "payOrder", "clearCart",
             "submitTicket", "updateAddress", "deleteAddress", "addToCart");
 
     private GoldenRules() {

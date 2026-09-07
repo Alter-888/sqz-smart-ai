@@ -12,7 +12,6 @@ const TOOL_HINT_LABELS = {
   updateCartQuantity: '更新购物车数量',
   removeFromCart: '移除商品',
   clearCart: '清空购物车',
-  checkoutFromCart: '结算下单',
   queryOrder: '查询订单',
   queryUserOrders: '查询订单列表',
   queryLogistics: '查询物流',

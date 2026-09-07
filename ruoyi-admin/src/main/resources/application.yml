@@ -186,7 +186,7 @@ smart-cs:
     supervisor-max-delegations: 3    # Supervisor 单轮最多委派几个 Worker
     eval-sample-rate: 0.1            # 异步抽检采样率
     hitl-enabled: true               # 高危操作先出待确认单
-    hitl-tools: cancelOrder,payOrder,checkoutFromCart,clearCart
+    hitl-tools: cancelOrder,payOrder,clearCart
   model:
     worker: ${AI_WORKER_MODEL:qwen3.7-flash}
     router: ${AI_ROUTER_MODEL:qwen3.7-flash}
